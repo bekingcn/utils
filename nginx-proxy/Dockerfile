@@ -1,9 +1,13 @@
-FROM centos:7
+FROM ubuntu:20.04
 
-RUN yum install -y patch gcc glibc-devel make openssl-devel pcre-devel zlib-devel gd-devel geoip-devel perl-devel
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Shanghai
 
-RUN groupadd -g 101 nginx \
-          && adduser  -u 101 -d /var/cache/nginx -s /sbin/nologin  -g nginx nginx 
+RUN apt update && apt upgrade -y && apt-get install build-essential libpcre3 libpcre3-dev zlib1g zlib1g-dev libssl-dev libgd-dev libxml2 libxml2-dev uuid-dev -y
+
+RUN groupadd -g 101 nginx
+RUN mkdir -p /var/cache/nginx
+RUN useradd  --uid 101 --home-dir /var/cache/nginx --shell /sbin/nologin  --gid nginx nginx 
 
 COPY ./nginx /nginx
 
