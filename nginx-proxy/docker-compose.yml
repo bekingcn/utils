@@ -1,11 +1,30 @@
 services:
   proxy:
     image: nginx:proxy_1.80.0
+
+    # ── 本次故障的修复本体：切到 host 网络 ──────────────────────────────
+    # 本机（Codespaces）的 Docker bridge 出网被拦：到网关 172.18.0.1 能收到
+    # RST（IP 层可达），但所有外部地址（1.1.1.1:443 / 8.8.8.8:53 /
+    # 168.63.129.16:53）一律 FAIL；nat POSTROUTING 里 172.18.0.0/16 的
+    # MASQUERADE 命中数为 0 —— 包在到达 POSTROUTING 之前就被丢了。
+    # 包出不去，DNS 查询自然收不到回包，nginx 就报 110 timed out。
+    #
+    # 改成 host 后容器共享 devcontainer 的网络栈，绕开 Docker 的 NAT 层。
+    # 同一镜像起 --network host 临时容器实测 4/4 全通，改后生产容器
+    # `curl -x http://127.0.0.1:18088 https://www.google.com` 返回 HTTP 200。
+    network_mode: host
+
+    # ── host 模式下不能再发布端口（compose 会直接报错），端口天然绑在
+    #    devcontainer 上。实测只用得到 18088，4000/8443 原本也没在用，一并注释。
+    # ports:
+    #   - "18088:18088"
+    #   - "4000:80"
+    #   - "8443:443"
+
     volumes:
-      - "$PWD/nginx.conf:/etc/nginx/nginx.conf"
-      - "$PWD/nginx-log:/var/log/nginx"
-    ports:
-      - "18088:18088"
-      - "4000:80"
-      - "8443:443"
+      # 用 ./ 而不是 $PWD：$PWD 由执行 compose 时的当前目录决定，一旦从别的
+      # 目录执行（例如 postStartCommand 从 workspace 根跑）就会挂错路径；
+      # ./ 由 compose 按 compose 文件所在目录解析，任何 cwd 都正确。
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx-log:/var/log/nginx
     restart: unless-stopped
